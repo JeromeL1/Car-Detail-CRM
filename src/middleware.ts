@@ -2,44 +2,35 @@ import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL as string
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
+
 export async function middleware(req: NextRequest) {
-  try {
-    const res = NextResponse.next()
-    const supabase = createMiddlewareClient({ req, res })
+  const res = NextResponse.next()
+  const supabase = createMiddlewareClient(
+    { req, res },
+    { supabaseUrl: SUPABASE_URL, supabaseKey: SUPABASE_ANON_KEY }
+  )
 
-    // Refresh session if expired
-    const { data: { session }, error } = await supabase.auth.getSession()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
 
-    if (error) {
-      console.error('Auth session error:', error)
-      return res
-    }
+  const { pathname } = req.nextUrl
 
-    // If no session and trying to access protected routes, redirect to login
-    if (!session && req.nextUrl.pathname.startsWith('/dashboard')) {
-      const redirectUrl = req.nextUrl.clone()
-      redirectUrl.pathname = '/auth/login'
-      redirectUrl.searchParams.set('redirectedFrom', req.nextUrl.pathname)
-      return NextResponse.redirect(redirectUrl)
-    }
-
-    // If has session and trying to access auth pages, redirect to dashboard
-    if (session && (req.nextUrl.pathname.startsWith('/auth'))) {
-      const redirectUrl = req.nextUrl.clone()
-      redirectUrl.pathname = '/dashboard'
-      return NextResponse.redirect(redirectUrl)
-    }
-
-    return res
-  } catch (error) {
-    console.error('Middleware error:', error)
-    return NextResponse.next()
+  // unauthenticated -> dashboard requires auth
+  if (!session && pathname.startsWith('/dashboard')) {
+    return NextResponse.redirect(new URL('/auth/login', req.url))
   }
+
+  // authenticated user visiting auth pages or root gets bounced to dashboard
+  if (session && (pathname === '/' || pathname.startsWith('/auth'))) {
+    return NextResponse.redirect(new URL('/dashboard', req.url))
+  }
+
+  return res
 }
 
 export const config = {
-  matcher: [
-    '/dashboard/:path*',
-    '/auth/:path*'
-  ]
+  matcher: ['/', '/dashboard/:path*', '/auth/:path*'],
 } 
