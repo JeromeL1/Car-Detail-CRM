@@ -18,12 +18,12 @@ export async function middleware(req: NextRequest) {
 
   const { pathname } = req.nextUrl
 
-  // unauthenticated -> dashboard requires auth
+  // unauthenticated -> protected app area
   if (!session && pathname.startsWith('/dashboard')) {
     return NextResponse.redirect(new URL('/auth/login', req.url))
   }
 
-  // authenticated user visiting auth pages or root gets bounced to dashboard
+  // authenticated user visiting auth pages or landing page gets bounced to /dashboard
   if (session && (pathname === '/' || pathname.startsWith('/auth'))) {
     return NextResponse.redirect(new URL('/dashboard', req.url))
   }
