@@ -24,7 +24,10 @@ export async function middleware(req: NextRequest) {
   }
 
   // authenticated user visiting auth pages or landing page gets bounced to /dashboard
-  if (session && (pathname === '/' || pathname.startsWith('/auth'))) {
+  if (
+    session &&
+    (pathname === '/' || (pathname.startsWith('/auth') && pathname !== '/auth/logout'))
+  ) {
     return NextResponse.redirect(new URL('/dashboard', req.url))
   }
 
