@@ -1,10 +1,17 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/types/supabase'
 
-type Customer = Database['public']['Tables']['customers']['Row']
+// NOTE: customer data comes from `customers` joined with the related `profiles`
+type Customer = Database['public']['Tables']['customers']['Row'] & {
+  profiles: {
+    first_name: string | null
+    last_name: string | null
+    email: string | null
+    phone_number: string | null
+  } | null
+}
 
 type Props = {
   initialCustomers: Customer[]
@@ -13,23 +20,48 @@ type Props = {
 export default function CustomersTable({ initialCustomers }: Props) {
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers)
   const [showForm, setShowForm] = useState(false)
-  const [formState, setFormState] = useState({ first_name: '', last_name: '', email: '', phone: '' })
+  const [formState, setFormState] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+  })
   const [saving, setSaving] = useState(false)
-  const supabase = createClient()
 
   const addCustomer = async () => {
     setSaving(true)
-    const { data, error } = await supabase.from('customers').insert({
-      first_name: formState.first_name,
-      last_name: formState.last_name,
-      email: formState.email || null,
-      phone: formState.phone || null,
-    }).select('*').single()
 
-    if (!error && data) setCustomers([...customers, data as Customer])
+    const res = await fetch('/api/customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        first_name: formState.first_name,
+        last_name: formState.last_name,
+        email: formState.email,
+        phone: formState.phone,
+      }),
+    })
+
+    if (res.ok) {
+      const { customer } = await res.json()
+      // Attach the profile info so the UI can display it immediately
+      const newCustomer: Customer = {
+        ...customer,
+        profiles: {
+          first_name: formState.first_name,
+          last_name: formState.last_name,
+          email: formState.email,
+          phone_number: formState.phone,
+        },
+      }
+      setCustomers([...customers, newCustomer])
+      setShowForm(false)
+      setFormState({ first_name: '', last_name: '', email: '', phone: '' })
+    } else {
+      const { error } = await res.json()
+      alert(error ?? 'Failed to add customer')
+    }
     setSaving(false)
-    setShowForm(false)
-    setFormState({ first_name: '', last_name: '', email: '', phone: '' })
   }
 
   return (
@@ -53,11 +85,13 @@ export default function CustomersTable({ initialCustomers }: Props) {
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {customers.map(c => (
+          {customers.map((c) => (
             <tr key={c.id}>
-              <td className="px-4 py-2">{c.first_name} {c.last_name}</td>
-              <td className="px-4 py-2">{c.email}</td>
-              <td className="px-4 py-2">{c.phone}</td>
+              <td className="px-4 py-2">
+                {c.profiles?.first_name} {c.profiles?.last_name}
+              </td>
+              <td className="px-4 py-2">{c.profiles?.email}</td>
+              <td className="px-4 py-2">{c.profiles?.phone_number}</td>
             </tr>
           ))}
         </tbody>
@@ -68,18 +102,57 @@ export default function CustomersTable({ initialCustomers }: Props) {
           <div className="bg-white p-6 rounded-md w-full max-w-md space-y-4">
             <h3 className="text-lg font-medium">Add Customer</h3>
             <div className="space-y-3">
-              <input className="w-full border px-3 py-2" placeholder="First name" value={formState.first_name} onChange={e=>setFormState({...formState, first_name:e.target.value})} />
-              <input className="w-full border px-3 py-2" placeholder="Last name" value={formState.last_name} onChange={e=>setFormState({...formState, last_name:e.target.value})} />
-              <input className="w-full border px-3 py-2" placeholder="Email" value={formState.email} onChange={e=>setFormState({...formState, email:e.target.value})} />
-              <input className="w-full border px-3 py-2" placeholder="Phone" value={formState.phone} onChange={e=>setFormState({...formState, phone:e.target.value})} />
+              <input
+                className="w-full border px-3 py-2"
+                placeholder="First name"
+                value={formState.first_name}
+                onChange={(e) =>
+                  setFormState({ ...formState, first_name: e.target.value })
+                }
+              />
+              <input
+                className="w-full border px-3 py-2"
+                placeholder="Last name"
+                value={formState.last_name}
+                onChange={(e) =>
+                  setFormState({ ...formState, last_name: e.target.value })
+                }
+              />
+              <input
+                className="w-full border px-3 py-2"
+                placeholder="Email"
+                value={formState.email}
+                onChange={(e) =>
+                  setFormState({ ...formState, email: e.target.value })
+                }
+              />
+              <input
+                className="w-full border px-3 py-2"
+                placeholder="Phone"
+                value={formState.phone}
+                onChange={(e) =>
+                  setFormState({ ...formState, phone: e.target.value })
+                }
+              />
             </div>
             <div className="flex justify-end space-x-2">
-              <button className="px-4 py-2 text-sm" onClick={()=>setShowForm(false)}>Cancel</button>
-              <button disabled={saving} className="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white disabled:opacity-50" onClick={addCustomer}>Save</button>
+              <button
+                className="px-4 py-2 text-sm"
+                onClick={() => setShowForm(false)}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={saving}
+                className="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+                onClick={addCustomer}
+              >
+                {saving ? 'Saving...' : 'Save'}
+              </button>
             </div>
           </div>
         </div>
       )}
     </div>
   )
-} 
+}
