@@ -1,10 +1,14 @@
 'use client'
 
+import { Suspense } from 'react'
+
+export const dynamic = 'force-dynamic'
+
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-export default function LoginPage() {
+function LoginPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirectedFrom') || '/dashboard'
@@ -91,9 +95,17 @@ export default function LoginPage() {
           href="/auth/signup"
           className="font-medium text-blue-600 hover:text-blue-500"
         >
-          Don't have an account? Sign up
+          Don&apos;t have an account? Sign up
         </a>
       </div>
     </>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
   )
 } 
